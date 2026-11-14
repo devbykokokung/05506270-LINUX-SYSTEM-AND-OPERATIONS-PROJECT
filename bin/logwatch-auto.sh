@@ -92,9 +92,20 @@ load_config() {
     esac
 }
 
+check_deps() {
+    local cmd
+    for cmd in "$@"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            log ERROR "required command not found: $cmd"
+            exit 1
+        fi
+    done
+}
+
 main() {
     parse_args "$@"
     load_config "$CONFIG_FILE"
+    check_deps awk grep sed sort uniq cut date
     debug "config loaded: $CONFIG_FILE"
     debug "TOP_N=$TOP_N MAX_ATTEMPT=$MAX_ATTEMPT DRY_RUN=$DRY_RUN NO_ACTION=$NO_ACTION"
 

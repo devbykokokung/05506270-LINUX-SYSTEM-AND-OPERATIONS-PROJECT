@@ -12,6 +12,7 @@ NO_ACTION=0
 CONFIRM=0
 SINCE=""
 BLOCK_IP=""
+OPT_TOP=""
 
 log() {
     local level="$1"; shift
@@ -27,13 +28,14 @@ debug() {
 
 usage() {
     cat <<USAGE
-Usage: $SCRIPT_NAME [-c config] [-v] [-n] [-h] [--since DATE]
+Usage: $SCRIPT_NAME [-c config] [-v] [-n] [-h] [-t N] [--since DATE]
        $SCRIPT_NAME [-c config] [-v] [-n] [-y] --block IP
 ดูรายงาน SSH login ที่ล้มเหลว และ block IP ด้วย ufw
   -c FILE        ระบุไฟล์ config (ค่าเริ่มต้น: $DEFAULT_CONFIG)
   -v             แสดงรายละเอียดการทำงาน
   -n             dry-run (แสดงสิ่งที่จะทำ แต่ไม่ทำจริง)
   -h             แสดงวิธีใช้
+  -t N           จำนวนอันดับที่แสดง (แทนค่า TOP_N ใน config)
   --since DATE   ดูข้อมูลตั้งแต่วันที่ DATE ถึงปัจจุบัน
   --block IP     สั่ง ufw deny IP (ถ้า DRY_RUN=ON จะเป็น dry-run)
   -y             ยืนยันให้ block จริง
@@ -59,6 +61,7 @@ parse_args() {
             -v|--verbose) VERBOSE=1;   shift ;;
             -n|--dry-run) NO_ACTION=1; shift ;;
             -y|--yes)     CONFIRM=1;   shift ;;
+            -t|--top)     need_arg "$@"; OPT_TOP="$2"; shift 2 ;;
             --since)      need_arg "$@"; SINCE="$2";    shift 2 ;;
             --block)      need_arg "$@"; BLOCK_IP="$2"; shift 2 ;;
             *)            usage_error "unknown option: $1" ;;
@@ -110,9 +113,26 @@ load_config() {
     esac
 }
 
+check_deps() {
+    local cmd
+    for cmd in "$@"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            log ERROR "required command not found: $cmd"
+            exit 1
+        fi
+    done
+}
+
 main() {
     parse_args "$@"
     load_config "$CONFIG_FILE"
+
+    check_deps awk grep sed sort uniq cut date
+    if [[ -n "$OPT_TOP" ]]; then
+        if ! is_posint "$OPT_TOP"; then usage_error "-t needs a positive integer (got '$OPT_TOP')"; fi
+        TOP_N="$OPT_TOP"
+    fi
+
     debug "config loaded: $CONFIG_FILE"
     debug "TOP_N=$TOP_N MAX_ATTEMPT=$MAX_ATTEMPT DRY_RUN=$DRY_RUN NO_ACTION=$NO_ACTION"
     debug "SINCE='$SINCE' BLOCK_IP='$BLOCK_IP' CONFIRM=$CONFIRM"
