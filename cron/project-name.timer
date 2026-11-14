@@ -1,2 +1,0 @@
-# Run project-name every day at 02:00
-0 2 * * * /usr/local/bin/project-name.sh

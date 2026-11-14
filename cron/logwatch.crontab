@@ -1,0 +1,6 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+5 * * * * root flock -n /run/lock/logwatch-analyze.lock /usr/local/bin/logwatch-auto.sh --analyze >> /var/log/logwatch-cron.log 2>&1
+
+10 0 * * * root flock -n /run/lock/logwatch-report.lock /usr/local/bin/logwatch-auto.sh --report >> /var/log/logwatch-cron.log 2>&1

@@ -1,0 +1,16 @@
+# LogWatch - log rotation. Install as /etc/logrotate.d/logwatch (root:root, mode 644).
+# If you change LOG_FILE in logwatch.conf, change the first path here to match.
+# Daily reports in AUTO_REPORT_DIR are not rotated here (one file per day).
+
+/var/log/logwatch.log /var/log/logwatch-cron.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+    # Ubuntu's /var/log is group-writable (root:syslog 775), and logrotate refuses to
+    # rotate files there unless told which user/group to use.
+    su root root
+}
