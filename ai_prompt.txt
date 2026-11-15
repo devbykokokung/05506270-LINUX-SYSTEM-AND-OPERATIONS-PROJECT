@@ -1,0 +1,109 @@
+Let's begin with option first (I also change some logic)
+>> "logwatch.sh" for user will accept option
+-h = help
+-c = config file
+-v = verbose
+-n = dry-run --- will work if it is with --report which will prevent report from being generated
+
+--analyze = collect log from auth.log and their underlying compressed log, select log from start of today (midnight) or since (if follow by --since YYYY-MM-DD) until current time (got calling by users) and analyze the log by extract only failed login which come from ssh service then extract IP and username as a pair
+then we show
+1) TOP_N (default is 10) frequenzy of each pair (IP, username)
+2) TOP_N of IP failed login to any username
+3) TOP_N of username that has been try and failed by any IP
+4) IP that has been attempt to login any username and failed exceed MAX_ATTEMP (default is 3)
+
+--report = collect log from auth.log and their underlying compressed log, select log from start of today (midnight) or since (if follow by --since YYYY-MM-DD) until current time (got calling by users) then analyze and write file for current time which contain
+1) TOP_N frequenzy of each pair (IP, username)
+2) TOP_N of IP failed login to any username
+3) TOP_N of username that has been try and failed by any IP
+4) IP that has been attempt to login any username and failed exceed MAX_ATTEMP
+
+and all-time section which contain all failed attempt which made from all of auth.log and their underlying compressed log combine together until now then write
+1) TOP_N frequenzy of each pair (IP, username)
+2) TOP_N of IP failed login to any username
+3) TOP_N of username that has been try and failed by any IP
+4) IP that has been attempt to login any username and failed exceed MAX_ATTEMP of all time
+ 
+--since YYYY-MM-DD = collect log from auth.log and their underlying compressed log, select only from YYYY-MM-DD  until calling time, will be together with --analyze or --report
+
+--block XXX:XXX:XXX:XXX = accept IPv4 and IPv6. Follow DRY_RUN_BLOCK config
+if DRY_RUN_BLOCK="ON"/"true" then it will block that IP until service reboot
+if DRY_RUN_BLOCK="OFF"/"false" or specify with -y then it will block that IP permanently (no unblock)
+
+>> "logwatch-auto.sh" for crontab will accept option
+
+(these 4 option primary used for debugging)
+-h = help
+-c = config file
+-v = verbose
+-n = dry-run --- will work if it is with --report which will prevent report from being generated
+
+--analyze = collect log from auth.log and their underlying compressed log, from start of today (midnight) until current time (got calling by crontab) and analyze the log by extract only failed login which come from ssh service then extract IP and username as a pair
+then notify "IP that has been attempt to login any username and failed exceed MAX_ATTEMP" to log or write for journalctl for inspection
+
+--report = collect log from auth.log and their underlying compressed log, select log from full last day (could say doing daily report) then analyze and write file which contain
+1) TOP_N frequenzy of each pair (IP, username)
+2) TOP_N of IP failed login to any username
+3) TOP_N of username that has been try and failed by any IP
+4) IP that has been attempt to login any username and failed exceed MAX_ATTEMP
+
+and all-time section which contain all failed attempt which made from all of auth.log and there underlying compressed log combine together until now then write
+1) TOP_N frequenzy of each pair (IP, username)
+2) TOP_N of IP failed login to any username
+3) TOP_N of username that has been try and failed by any IP
+4) IP that has been attempt to login any username and failed exceed MAX_ATTEMP of all time
+
+Note: for both version, --analyze and --report should be mutual exclusive. Their result report will be generate to different directory, and crontab version will be generate with timestamp format like YYYY-MM-DD but user version report will contain YYYY-MM-DDTHH:MM:SS too
+
+MAX_ATTEMP and TOP_N will get value from logwatch.conf
+
+--block will able to follow by -y only. -n is for dry-run on report generation
+
+>> Explain concept and concern for me and what you will do, no need to fully rewrite
+
+------------------------------------------------------------------------------------
+
+>> Decisions You need
+1) keep only Failed password, Invalid user, if this cause duplication then select only Failed password
+2) Just my misspelling use MAX_ATTEMPT with default 5
+3) Yes. It a bit exaggerated, let's label it an "all available log" instead
+4) Cap around 10 IPs after that, used "+N more" (note that it should ranking first, so IP which has been heavily try and failed will show up first)
+5 & 6) for --block -n I think it should preview the command we will run after calling depend on mode. if "BLOCK_MODE=temporary" then we need -y for permanent block
+which mean if we go --block -y -n then we will get the same command as --block -n when "BLOCK_MODE=permanent"
+
+Biggest technical concern: “block until reboot”
+use "A raw iptables rule" because I want it to disappear on "ufw reload" or service reboot or restart
+
+As for permanent block, follow as you said, since my script will act like a simple proxy/middleman for ufw
+
+------------------------------------------------------------------------------------
+
+>> Log reading concerns
+"A journald-only system has no auth.log. Which OS and OpenSSH version is the target server?"
+Use only system which has auth.log. so no need to concern about journald 
+
+Also, this script need sudo privilege, worth checking before running anythings
+
+Timestamps
+Explains more about half-open time. I aware that we will get unconsistent but shouldn't we grab last hour? Do this cause logic too dependent with schedule?
+"All times are server-local. If the server isn’t on Asia/Bangkok time, “midnight” means server midnight." No need to concern about timezone, it's a simple script
+
+Output files and notifications
+"Colons in filenames": Yep, use YYYY-MM-DDTHH-MM-SS
+"Notifications use logger -t logwatch with a non-auth facility, so they don’t feed back into auth.log" Anyways to notify it to journalctl, also Yep, no state file
+
+Pondering what I tell you, other than that is fine for now
+
+------------------------------------------------------------------------------------
+
+What you need from me
+1) use Window A
+2) let's say it enabled
+3) Already upload file, ignore it's file name. my friend just rename it
+
+"Failed password only" just grep Failed password error then find "from" position and strip username and IP. I think this able to handle both failed on valid username and invalid user
+
+"ls -l /var/log/auth.log* (to confirm rotated names and .gz)" use traditional or default name and extension which will be generated when rotating. No need to concern about custom name
+"your > or >= choice" I stand ground with exceed, so ">"
+
+Also Ignore other security concern in sample data. This script is simple (again)
